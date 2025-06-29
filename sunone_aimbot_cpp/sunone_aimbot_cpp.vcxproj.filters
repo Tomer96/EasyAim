@@ -38,6 +38,7 @@
     <ClCompile Include="detector\detection_buffer.cpp" />
     <ClCompile Include="mouse\kmbox_net\kmboxNet.cpp" />
     <ClCompile Include="mouse\kmboxNetConnection.cpp" />
+    <ClCompile Include="mouse\RawHidConnection.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="scr">
@@ -84,6 +85,12 @@
     <ClInclude Include="mouse\kmbox_net\kmboxNet.h" />
     <ClInclude Include="mouse\kmbox_net\picture.h" />
     <ClInclude Include="mouse\kmboxNetConnection.h" />
+    <ClInclude Include="mouse\RawHidConnection.h" />
+    <ClInclude Include="modules\serial\include\serial\serial.h" />
+    <ClInclude Include="modules\serial\include\serial\v8stdint.h" />
+    <ClInclude Include="modules\serial\include\serial\impl\unix.h" />
+    <ClInclude Include="modules\serial\include\serial\impl\win.h" />
+    <ClInclude Include="modules\SimpleIni.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -92,5 +99,9 @@
   </ItemGroup>
   <ItemGroup>
     <AppxManifest Include="Package.appxmanifest" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="modules\opencv\build\install\x64\vc17\lib\opencv_world4100.lib" />
+    <Library Include="modules\serial\visual_studio\x64\Release\serial.lib" />
   </ItemGroup>
 </Project>

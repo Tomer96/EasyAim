@@ -36,6 +36,7 @@ GhubMouse* gHub = nullptr;
 SerialConnection* arduinoSerial = nullptr;
 Kmbox_b_Connection* kmboxSerial = nullptr;
 KmboxNetConnection* kmboxNetSerial = nullptr;
+RawHidConnection* rawhid_connection = nullptr;
 
 std::atomic<bool> detection_resolution_changed(false);
 std::atomic<bool> capture_method_changed(false);
@@ -52,6 +53,11 @@ std::atomic<bool> shooting(false);
 
 void createInputDevices()
 {
+    if (rawhid_connection)
+    {
+        delete rawhid_connection;
+        rawhid_connection = nullptr;
+    }
     if (arduinoSerial)
     {
         delete arduinoSerial;
@@ -76,8 +82,20 @@ void createInputDevices()
         delete kmboxNetSerial;
         kmboxNetSerial = nullptr;
     }
+    if (config.input_method == "SPOOFED_ARDUINO")
+    {
+        std::cout << "[Mouse] Using Spoofed Arduino (RawHID) method input." << std::endl;
+        // Use the VID/PID from your config file now
+        rawhid_connection = new RawHidConnection(config.spoofed_arduino.vid, config.spoofed_arduino.pid);
+        if (!rawhid_connection->connect())
+        {
+            std::cerr << "!!! Failed to connect to spoofed Arduino !!!" << std::endl;
+            delete rawhid_connection;
+            rawhid_connection = nullptr;
+        }
+	}
 
-    if (config.input_method == "ARDUINO")
+    else if (config.input_method == "ARDUINO")
     {
         std::cout << "[Mouse] Using Arduino method input." << std::endl;
         arduinoSerial = new SerialConnection(config.arduino_port, config.arduino_baudrate);
@@ -128,6 +146,7 @@ void assignInputDevices()
         globalMouseThread->setGHubMouse(gHub);
         globalMouseThread->setKmboxConnection(kmboxSerial);
         globalMouseThread->setKmboxNetConnection(kmboxNetSerial);
+		globalMouseThread->setRawHidConnection(rawhid_connection);
     }
 }
 
@@ -138,7 +157,11 @@ void handleEasyNoRecoil(MouseThread& mouseThread)
         std::lock_guard<std::mutex> lock(mouseThread.input_method_mutex);
         int recoil_compensation = static_cast<int>(config.easynorecoilstrength);
         
-        if (arduinoSerial)
+        if (rawhid_connection)
+        {
+            rawhid_connection->move(0, recoil_compensation);
+        }
+        else if (arduinoSerial)
         {
             arduinoSerial->move(0, recoil_compensation);
         }
@@ -366,7 +389,8 @@ int main()
             arduinoSerial,
             gHub,
             kmboxSerial,
-            kmboxNetSerial
+            kmboxNetSerial,
+			rawhid_connection
         );
 
         globalMouseThread = &mouseThread;
@@ -464,6 +488,12 @@ int main()
             gHub->mouse_close();
             delete gHub;
         }
+
+        if (rawhid_connection)
+            {
+            delete rawhid_connection;
+            rawhid_connection = nullptr;
+		}
 
         if (dml_detector)
         {

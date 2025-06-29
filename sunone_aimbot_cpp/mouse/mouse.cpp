@@ -9,12 +9,23 @@
 #include <mutex>
 #include <atomic>
 #include <vector>
+#include <utility>
+#include <queue>
+#include <thread>
+
 
 #include "mouse.h"
 #include "capture.h"
 #include "SerialConnection.h"
 #include "sunone_aimbot_cpp.h"
 #include "ghub.h"
+#include "Kmbox_b.h"
+#include "KmboxNetConnection.h"
+#include "RawHidConnection.h"
+
+
+constexpr double MAX_VELOCITY = 20000.0;
+constexpr double MIN_DT = 1e-8;
 
 MouseThread::MouseThread(
     int resolution,
@@ -28,7 +39,9 @@ MouseThread::MouseThread(
     SerialConnection* serialConnection,
     GhubMouse* gHubMouse,
     Kmbox_b_Connection* kmboxConnection,
-    KmboxNetConnection* Kmbox_Net_Connection)
+    KmboxNetConnection* Kmbox_Net_Connection,
+    RawHidConnection* rawHidConnection)
+
     : screen_width(resolution),
     screen_height(resolution),
     prediction_interval(predictionInterval),
@@ -45,7 +58,7 @@ MouseThread::MouseThread(
     kmbox(kmboxConnection),
     kmbox_net(Kmbox_Net_Connection),
     gHub(gHubMouse),
-
+    rawhid(rawHidConnection),
     prev_velocity_x(0.0),
     prev_velocity_y(0.0),
     prev_x(0.0),
@@ -117,7 +130,12 @@ void MouseThread::moveWorkerLoop()
             Move m = moveQueue.front();
             moveQueue.pop();
             ul.unlock();
-            sendMovementToDriver(m.dx, m.dy);
+
+            if (wind_mouse_enabled)
+                windMouseMoveRelative(m.dx, m.dy);
+            else
+                sendMovementToDriver(m.dx, m.dy);
+
             ul.lock();
         }
     }
@@ -191,13 +209,13 @@ std::pair<double, double> MouseThread::predict_target_position(double target_x, 
     }
 
     double dt = std::chrono::duration<double>(current_time - prev_time).count();
-    if (dt < 1e-8) dt = 1e-8;
+    if (dt < MIN_DT) dt = MIN_DT;
 
     double vx = (target_x - prev_x) / dt;
     double vy = (target_y - prev_y) / dt;
 
-    vx = std::clamp(vx, -20000.0, 20000.0);
-    vy = std::clamp(vy, -20000.0, 20000.0);
+    vx = std::clamp(vx, -MAX_VELOCITY, MAX_VELOCITY);
+    vy = std::clamp(vy, -MAX_VELOCITY, MAX_VELOCITY);
 
     prev_time = current_time;
     prev_x = target_x;
@@ -229,17 +247,21 @@ void MouseThread::sendMovementToDriver(int dx, int dy)
 {
     std::lock_guard<std::mutex> lock(input_method_mutex);
 
-    if (kmbox)
+    if (rawhid)
+    {
+        rawhid->move(dx, dy);
+    }
+    else if (serial)
+    {
+        serial->move(dx, dy);
+    }
+    else if (kmbox)
     {
         kmbox->move(dx, dy);
     }
     else if (kmbox_net)
     {
         kmbox_net->move(dx, dy);
-    }
-    else if (serial)
-    {
-        serial->move(dx, dy);
     }
     else if (gHub)
     {
@@ -344,10 +366,10 @@ void MouseThread::moveMousePivot(double pivotX, double pivotY)
 
     double dt = std::chrono::duration<double>(current_time - prev_time).count();
     prev_time = current_time;
-    dt = std::max(dt, 1e-8);
+    dt = std::max(dt, MIN_DT);
 
-    double vx = std::clamp((pivotX - prev_x) / dt, -20000.0, 20000.0);
-    double vy = std::clamp((pivotY - prev_y) / dt, -20000.0, 20000.0);
+    double vx = std::clamp((pivotX - prev_x) / dt, -MAX_VELOCITY, MAX_VELOCITY);
+    double vy = std::clamp((pivotY - prev_y) / dt, -MAX_VELOCITY, MAX_VELOCITY);
     prev_x = pivotX; prev_y = pivotY;
     prev_velocity_x = vx;  prev_velocity_y = vy;
 
@@ -369,17 +391,21 @@ void MouseThread::pressMouse(const AimbotTarget& target)
     bool bScope = check_target_in_scope(target.x, target.y, target.w, target.h, bScope_multiplier);
     if (bScope && !mouse_pressed)
     {
-        if (kmbox)
+        if (rawhid)
+        {
+            rawhid->press();
+        }
+        else if (serial)
+        {
+            serial->press();
+        }
+        else if (kmbox)
         {
             kmbox->press(0);
         }
         else if (kmbox_net)
         {
             kmbox_net->keyDown(0);
-        }
-        else if (serial)
-        {
-            serial->press();
         }
         else if (gHub)
         {
@@ -396,17 +422,21 @@ void MouseThread::pressMouse(const AimbotTarget& target)
     }
     else if (!bScope && mouse_pressed)
     {
-        if (kmbox)
+        if (rawhid)
+        {
+            rawhid->release();
+        }
+        else if (serial)
+        {
+            serial->release();
+        }
+        else if (kmbox)
         {
             kmbox->release(0);
         }
         else if (kmbox_net)
         {
             kmbox_net->keyUp(0);
-        }
-        else if (serial)
-        {
-            serial->release();
         }
         else if (gHub)
         {
@@ -429,17 +459,21 @@ void MouseThread::releaseMouse()
 
     if (mouse_pressed)
     {
-        if (kmbox)
+        if (rawhid)
+        {
+           rawhid->release(); 
+        }
+        else if (serial)
+        {
+            serial->release();
+        }
+        else if (kmbox)
         {
             kmbox->release(0);
         }
         else if (kmbox_net)
         {
             kmbox_net->keyUp(0);
-        }
-        else if (serial)
-        {
-            serial->release();
         }
         else if (gHub)
         {
@@ -549,4 +583,10 @@ void MouseThread::setGHubMouse(GhubMouse* newGHub)
 {
     std::lock_guard<std::mutex> lock(input_method_mutex);
     gHub = newGHub;
+}
+void MouseThread::setRawHidConnection(RawHidConnection* newRawHid)
+{
+    std::lock_guard<std::mutex> lock(input_method_mutex);
+    rawhid = newRawHid;
+    std::cout << "Raw HID updated." << std::endl;
 }

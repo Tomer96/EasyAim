@@ -2,11 +2,12 @@
 #define _WINSOCKAPI_
 #include <winsock2.h>
 #include <Windows.h>
-
+#include <d3d11.h>
 #include "imgui/imgui.h"
 #include "sunone_aimbot_cpp.h"
 #include "overlay.h"
 #include "capture.h"
+
 
 void draw_stats()
 {

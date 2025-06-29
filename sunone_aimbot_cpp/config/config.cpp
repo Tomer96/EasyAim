@@ -98,6 +98,12 @@ bool Config::loadConfig(const std::string& filename)
         arduino_16_bit_mouse = false;
         arduino_enable_keys = false;
 
+		// Spoofed Arduino (RawHID)
+		spoofed_arduino.vid = 0x046D; // Default VID for Raw HID 
+        // Note: VID/PID can be changed in the config file later
+		// If you want to use a different device, change these values accordingly
+		spoofed_arduino.pid = 0xC53F; // Default PID for Raw HID
+
         // kmbox_B
         kmbox_b_baudrate = 115200;
         kmbox_b_port = "COM0";
@@ -315,6 +321,11 @@ bool Config::loadConfig(const std::string& filename)
     arduino_16_bit_mouse = get_bool("arduino_16_bit_mouse", false);
     arduino_enable_keys = get_bool("arduino_enable_keys", false);
 
+	// Spoofed Arduino (RawHID)
+	spoofed_arduino.vid = get_long("spoofed_arduino_vid", 0x046D); // Default VID for Raw HID
+	spoofed_arduino.pid = get_long("spoofed_arduino_pid", 0xC53F); // Default PID for Raw HID
+
+
     // kmbox_B
     kmbox_b_baudrate = get_long("kmbox_baudrate", 115200);
     kmbox_b_port = get_string("kmbox_port", "COM0");
@@ -475,6 +486,11 @@ bool Config::saveConfig(const std::string& filename)
         << "arduino_port = " << arduino_port << "\n"
         << "arduino_16_bit_mouse = " << (arduino_16_bit_mouse ? "true" : "false") << "\n"
         << "arduino_enable_keys = " << (arduino_enable_keys ? "true" : "false") << "\n\n";
+
+	// Spoofed Arduino (RawHID)
+    file << "# Spoofed Arduino (RawHID)\n"
+        << "spoofed_arduino_vid = " << std::hex << std::uppercase << spoofed_arduino.vid << "\n"
+		<< "spoofed_arduino_pid = " << std::hex << std::uppercase << spoofed_arduino.pid << "\n\n";
 
     // kmbox_B
     file << "# Kmbox_B\n"

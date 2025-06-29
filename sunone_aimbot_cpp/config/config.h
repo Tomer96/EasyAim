@@ -6,6 +6,17 @@
 #include <unordered_map>
 #include <utility>
 
+// Namespace to hold constants for input method names.
+// This prevents typos and makes the code more maintainable.
+namespace InputMethods {
+    inline constexpr const char* Win32 = "WIN32";
+    inline constexpr const char* GHUB = "GHUB";
+    inline constexpr const char* Arduino = "ARDUINO";
+    inline constexpr const char* SpoofedArduino = "SPOOFED_ARDUINO";
+    inline constexpr const char* KmboxB = "KMBOX_B";
+    inline constexpr const char* KmboxNet = "KMBOX_NET";
+}
+
 class Config
 {
 public:
@@ -46,7 +57,7 @@ public:
 
     bool easynorecoil;
     float easynorecoilstrength;
-    std::string input_method; // "WIN32", "GHUB", "ARDUINO", "KMBOX_B", "KMBOX_NET"
+    std::string input_method; // See InputMethods namespace for values
 
     // Wind mouse
     bool wind_mouse_enabled;
@@ -60,6 +71,13 @@ public:
     std::string arduino_port;
     bool arduino_16_bit_mouse;
     bool arduino_enable_keys;
+
+    // Spoofed Arduino (RawHID)
+    struct SpoofedArduino {
+        int vid;
+        int pid;
+    } spoofed_arduino;
+
 
     // kmbox_b
     int kmbox_b_baudrate;
@@ -131,18 +149,18 @@ public:
 
     struct GameProfile
     {
-        std::string name;
-        double sens;
-        double yaw;
-        double pitch;
-        bool fovScaled;
-        double baseFOV;
+        std::string name = ""; // Initialize with an empty string
+        double sens = 0.0;     // Initialize with a default value
+        double yaw = 0.0;      // Initialize with a default value
+        double pitch = 0.0;    // Initialize with a default value
+        bool fovScaled = false; // Initialize with a default value
+        double baseFOV = 0.0;  // Initialize with a default value
     };
 
     std::unordered_map<std::string, GameProfile> game_profiles;
     std::string                                  active_game;
 
-    const GameProfile & currentProfile() const;
+    const GameProfile& currentProfile() const;
     std::pair<double, double> degToCounts(double degX, double degY, double fovNow) const;
 
     bool loadConfig(const std::string& filename = "config.ini");

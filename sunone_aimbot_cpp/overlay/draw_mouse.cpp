@@ -321,7 +321,7 @@ void draw_mouse()
     }
 
     ImGui::SeparatorText("Input method");
-    std::vector<std::string> input_methods = { "WIN32", "GHUB", "ARDUINO", "KMBOX_B", "KMBOX_NET"};
+    std::vector<std::string> input_methods = { "WIN32", "GHUB", "ARDUINO", "SPOOFED_ARDUINO", "KMBOX_B", "KMBOX_NET"};
 
     std::vector<const char*> method_items;
     method_items.reserve(input_methods.size());
@@ -353,7 +353,54 @@ void draw_mouse()
         }
     }
 
-    if (config.input_method == "ARDUINO")
+    // --- Robustness, Clarity, Usability for SPOOFED_ARDUINO ---
+    if (config.input_method == "SPOOFED_ARDUINO")
+    {
+        ImGui::Text("Spoofed Arduino (RawHID) selected.");
+        ImGui::TextWrapped("This method uses a custom VID/PID to communicate with a RawHID Arduino device. Make sure your device matches these values.");
+        ImGui::TextWrapped("If you are using a custom Arduino firmware, make sure it supports RawHID communication and is configured correctly.");
+
+        // Usability: Show current values and allow editing
+        int vid = config.spoofed_arduino.vid;
+        int pid = config.spoofed_arduino.pid;
+        ImGui::Text("Current Spoofed Arduino VID/PID:");
+        ImGui::Text("Current VID: 0x%04X, PID: 0x%04X", vid, pid);
+        ImGui::Text("Change VID/PID to spoof a different device.");
+        ImGui::TextWrapped("Note: VID and PID must be in hexadecimal format (e.g., 0x046D for VID, 0xC53F for PID).");
+
+        // Clarity: Add tooltips and input hints
+        static char vid_hex[8], pid_hex[8];
+        static bool initialized = false;
+        if (!initialized) {
+            snprintf(vid_hex, sizeof(vid_hex), "%04X", config.spoofed_arduino.vid);
+            snprintf(pid_hex, sizeof(pid_hex), "%04X", config.spoofed_arduino.pid);
+            initialized = true;
+        }
+        ImGui::InputText("VID (hex)", vid_hex, sizeof(vid_hex), ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::InputText("PID (hex)", pid_hex, sizeof(pid_hex), ImGuiInputTextFlags_CharsHexadecimal);
+
+        int vid = 0, pid = 0;
+        sscanf(vid_hex, "%x", &vid);
+        sscanf(pid_hex, "%x", &pid);
+        bool valid = (vid > 0 && vid <= 0xFFFF && pid > 0 && pid <= 0xFFFF);
+        if (!valid)
+            ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "VID and PID must be between 0x0001 and 0xFFFF.");
+
+        if (ImGui::Button("Save Spoofed Arduino Settings") && valid) 
+        {
+            config.spoofed_arduino.vid = vid;
+            config.spoofed_arduino.pid = pid;
+            config.saveConfig();
+            input_method_changed.store(true);
+        }
+        ImGui::SameLine();
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Apply and save the new VID/PID. Device will reconnect.");
+
+        ImGui::Text("Current VID: 0x%04X, PID: 0x%04X", config.spoofed_arduino.vid, config.spoofed_arduino.pid);
+        ImGui::TextColored(ImVec4(1,1,0,1), "Note: VID/PID changes require device replug or restart.");
+    }
+    else if (config.input_method == "ARDUINO")
     {
         if (arduinoSerial)
         {
@@ -436,6 +483,7 @@ void draw_mouse()
         if (ImGui::Checkbox("Arduino Enable Keys", &config.arduino_enable_keys))
         {
             config.saveConfig();
+
             input_method_changed.store(true);
         }
     }
@@ -538,9 +586,12 @@ void draw_mouse()
     else if (config.input_method == "KMBOX_NET")
     {
         static char ip[32], port[8], uuid[16];
-        strncpy(ip, config.kmbox_net_ip.c_str(), sizeof(ip));
-        strncpy(port, config.kmbox_net_port.c_str(), sizeof(port));
-        strncpy(uuid, config.kmbox_net_uuid.c_str(), sizeof(uuid));
+        strncpy(ip, config.kmbox_net_ip.c_str(), sizeof(ip) - 1);
+        ip[sizeof(ip) - 1] = '\0';
+        strncpy(port, config.kmbox_net_port.c_str(), sizeof(port) - 1);
+        port[sizeof(port) - 1] = '\0';
+        strncpy(uuid, config.kmbox_net_uuid.c_str(), sizeof(uuid) - 1);
+        uuid[sizeof(uuid) - 1] = '\0';
 
         ImGui::InputText("kmboxNet IP", ip, sizeof(ip));
         ImGui::InputText("Port", port, sizeof(port));
@@ -616,6 +667,7 @@ void draw_mouse()
             config.bScope_multiplier);
 
         config.saveConfig();
+        std::cout << "[Config] Configuration saved successfully." << std::endl;
     }
 
     if (prev_wind_mouse_enabled != config.wind_mouse_enabled ||
@@ -641,6 +693,7 @@ void draw_mouse()
             config.bScope_multiplier);
 
         config.saveConfig();
+        std::cout << "[Config] Configuration saved successfully." << std::endl;
     }
 
     if (prev_auto_shoot != config.auto_shoot ||
@@ -660,5 +713,7 @@ void draw_mouse()
             config.bScope_multiplier);
 
         config.saveConfig();
+        std::cout << "[Config] Configuration saved successfully." << std::endl;
     }
+
 }

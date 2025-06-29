@@ -20,6 +20,7 @@
 #include "Kmbox_b.h"
 #include "KmboxNetConnection.h"
 #include "ghub.h"
+#include "RawHidConnection.h"
 
 class MouseThread
 {
@@ -48,6 +49,7 @@ private:
     Kmbox_b_Connection* kmbox;
     KmboxNetConnection* kmbox_net;
     GhubMouse* gHub;
+    RawHidConnection* rawhid;
 
     void sendMovementToDriver(int dx, int dy);
 
@@ -88,7 +90,8 @@ public:
         SerialConnection* serialConnection = nullptr,
         GhubMouse* gHubMouse = nullptr,
         Kmbox_b_Connection* kmboxConnection = nullptr,
-        KmboxNetConnection* Kmbox_Net_Connection = nullptr
+        KmboxNetConnection* Kmbox_Net_Connection = nullptr,
+        RawHidConnection* rawHidConnection = nullptr
     );
     ~MouseThread();
 
@@ -122,6 +125,7 @@ public:
     void setKmboxConnection(Kmbox_b_Connection* newKmbox);
     void setKmboxNetConnection(KmboxNetConnection* newKmbox_net);
     void setGHubMouse(GhubMouse* newGHub);
+    void setRawHidConnection(RawHidConnection* newRawHid);
 
     void setTargetDetected(bool detected) { target_detected.store(detected); }
     void setLastTargetTime(const std::chrono::steady_clock::time_point& t) { last_target_time = t; }
